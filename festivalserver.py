@@ -8,9 +8,7 @@ serverSocket = socket(AF_INET, SOCK_DGRAM)
 serverSocket.bind(('127.0.0.1', 12000))
 print("SERVER RUNNING")
 
-def rdt_rcv():
-	# 2 Check to see if the packet is corrupted or not
-	isCorrupt(serverSocket.recvfrom(1024))
+
 
 def isCorrupt():
 	# 3 Store checkSum number from packet into variable
