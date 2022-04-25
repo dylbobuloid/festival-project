@@ -1,5 +1,7 @@
 # FestivalClient.py
 # We will need the following module to generate randomized lost packets
+import hashlib
+import pickle
 import sys
 import socket
 from struct import *
@@ -19,10 +21,35 @@ print('sending "%s"' % Message)
 
 def create_packet():
     # Creating packet with the format
-    # Sequence number, Ack flag, payload length, payload, checkSum
-    packet = pack("i i i 5s i", 1, 0, 5, b"dylan", 1111)
-    return packet
+    seq_num = 0
+    ack_flag = 0
+    payload = b"Christmas"
+    pay_len = len(payload)
 
+    # Converting each number to 4 bytes as specified in RFC format
+    seq_num = seq_num.to_bytes(4, byteorder="little")
+    ack_flag = ack_flag.to_bytes(4, byteorder="little")
+    pay_len = pay_len.to_bytes(4, byteorder="little")
+
+    # Sequence number, Ack flag, payload length, payload, checkSum
+
+    pkt_no_checksum = seq_num + ack_flag + pay_len + payload
+    checksum_num = checksum(pkt_no_checksum)
+
+    checksum_num = checksum_num.encode('ascii')
+
+
+    # Concatenate all together to create packet
+    pkt = seq_num + ack_flag + pay_len + payload + checksum_num
+
+    return pkt
+
+
+def checksum(pkt):
+    h = hashlib.new('md5')
+    h.update(pickle.dumps(pkt))
+
+    return h.hexdigest()
 
 try:
     # sent the Message using the clientSock
