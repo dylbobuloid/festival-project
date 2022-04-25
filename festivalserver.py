@@ -13,8 +13,6 @@ print("SERVER RUNNING")
 
 
 def rdt_recv(rcvpkt):
-    # packet = rcvpkt.decode()
-
     # Sequence number, Ack flag, payload length, payload, checkSum
 
     packet = unpack("i i i 9s 32s ", rcvpkt)
@@ -51,11 +49,6 @@ def is_corrupt(packet):
 
 
 def checksum(pkt):
-    # Turns packet into a tuple
-    packet_with_checksum = unpack("i i i 9s 32s", pkt)
-    # Takes checkSum out of that packet
-    check_sum = packet_with_checksum[4].decode("ascii")
-
     # Recreates the checksum of the packet
     h = hashlib.new('md5')
     h.update(pickle.dumps(pkt))
@@ -63,18 +56,38 @@ def checksum(pkt):
     return h.hexdigest()
 
 
+def create_packet():
+    # Creating packet with the format
+    # Creating acknowledgement packet
+
+    seq_num = 0
+    ack_flag = 0
+    payload = b""
+    pay_len = len(payload)
+
+    # Converting each number to 4 bytes as specified in RFC format
+    seq_num = seq_num.to_bytes(4, byteorder="little")
+    ack_flag = ack_flag.to_bytes(4, byteorder="little")
+    pay_len = pay_len.to_bytes(4, byteorder="little")
+
+    # Sequence number, Ack flag, payload length, payload, checkSum
+
+    pkt_no_checksum = seq_num + ack_flag + pay_len + payload
+    checksum_num = checksum(pkt_no_checksum)
+
+    checksum_num = checksum_num.encode('ascii')
+
+    # Concatenate all together to create packet
+    pkt = seq_num + ack_flag + pay_len + payload + checksum_num
+
+    return pkt
+
+
 while True:
-    # 1 Wait to receive festival packet from client
-
-    # serverSocket.recvfrom(1024) && isCorrupt(serverSocket.recvfrom(1024))
-
-    # Receving packet from the client
-
+    # Receiving packet from the client
     client_data = serverSocket.recvfrom(1024)
-    print(client_data)
 
     # Data client has sends both the packet and the address it has received it from
-
     # packet from client
     packet = client_data[0]
 
@@ -85,7 +98,10 @@ while True:
 
     if not is_corrupt(packet):
         print("TEST SUCCESSFUL PACKET IS NOT CORRUPTED")
+        print("SENDING ACKNOWLEDGEMENT PACKET")
+        # Sending acknowledgement packet to the client
+        serverSocket.sendto(create_packet(), address)
+
+
     else:
         print("CORRUPTED")
-
-

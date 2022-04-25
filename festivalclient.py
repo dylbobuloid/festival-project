@@ -6,15 +6,11 @@ import socket
 # Create a UDP socket
 UDP_IP_ADDRESS = "127.0.0.1"
 UDP_PORT_NO = 12000
-Message = b"Hello, Server"
+
 
 # create a socket with address and port
 clientSock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 clientSock.connect(("127.0.0.1", 13000))
-
-# Prints the message that is being sent
-print('sending "%s"' % Message)
-
 
 def create_packet():
     # Creating packet with the format
@@ -57,8 +53,12 @@ def is_ack():
 
 try:
     # sent the Message using the clientSock
+    print('CLIENT RUNNING')
 
-    sent = clientSock.send(create_packet())
+    # Sending a packet with the festival request to the server
+
+    clientSock.send(create_packet())
+
     # Receive response
 
     print('waiting to receive')
@@ -66,7 +66,8 @@ try:
     # get the response & extract data
     message = clientSock.recv(1024)
 
-    print('MESSAGE FROM SERVER: "%s" ' % message.decode("ascii"))
+    #print('MESSAGE FROM SERVER: "%s" ' % message.decode("ascii"))
+    print('MESSAGE FROM SERVER: "%s" ' % message)
 
 
 except socket.timeout as inst:
