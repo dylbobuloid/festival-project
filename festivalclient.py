@@ -1,10 +1,7 @@
 # FestivalClient.py
-# We will need the following module to generate randomized lost packets
 import hashlib
 import pickle
-import sys
 import socket
-from struct import *
 
 # Create a UDP socket
 UDP_IP_ADDRESS = "127.0.0.1"
@@ -13,7 +10,7 @@ Message = b"Hello, Server"
 
 # create a socket with address and port
 clientSock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-clientSock.connect(("127.0.0.1", 12000))
+clientSock.connect(("127.0.0.1", 13000))
 
 # Prints the message that is being sent
 print('sending "%s"' % Message)
@@ -38,7 +35,6 @@ def create_packet():
 
     checksum_num = checksum_num.encode('ascii')
 
-
     # Concatenate all together to create packet
     pkt = seq_num + ack_flag + pay_len + payload + checksum_num
 
@@ -50,6 +46,14 @@ def checksum(pkt):
     h.update(pickle.dumps(pkt))
 
     return h.hexdigest()
+
+
+def is_ack():
+    # 7 Checks the acknowledgement flag in the packet whether it is a 0 or 1
+    # 8.1 if ACK flag 0 continue and make a packet makePacket()
+    # 8.2 if ACK flag 1 go back and
+    return 0
+
 
 try:
     # sent the Message using the clientSock
