@@ -2,27 +2,37 @@
 import hashlib
 import pickle
 import socket
+from struct import *
 
 # Create a UDP socket
 UDP_IP_ADDRESS = "127.0.0.1"
 UDP_PORT_NO = 12000
 
-
 # create a socket with address and port
 clientSock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 clientSock.connect(("127.0.0.1", 13000))
+
 
 def create_packet():
     # Creating packet with the format
     seq_num = 0
     ack_flag = 0
-    payload = b"Christmas"
-    pay_len = len(payload)
+    payload = "Christmas"
+    pay_len = len(payload.encode("ascii"))
+
+    # Need to pad the payload with extra characters since it is not at the maximum number of bytes
+    # Padding payload with f character
+    if len(payload) < 20:
+        temp = len(payload)
+        for i in range(temp, 20, 1):
+            payload = payload + "f"
+
+    payload = payload.encode("ascii")
 
     # Converting each number to 4 bytes as specified in RFC format
-    seq_num = seq_num.to_bytes(4, byteorder="little")
-    ack_flag = ack_flag.to_bytes(4, byteorder="little")
-    pay_len = pay_len.to_bytes(4, byteorder="little")
+    seq_num = seq_num.to_bytes(4, byteorder="big")
+    ack_flag = ack_flag.to_bytes(4, byteorder="big")
+    pay_len = pay_len.to_bytes(4, byteorder="big")
 
     # Sequence number, Ack flag, payload length, payload, checkSum
 
@@ -38,17 +48,47 @@ def create_packet():
 
 
 def checksum(pkt):
+    # Takes packet and passes into md5 to generate checkSum number
     h = hashlib.new('md5')
     h.update(pickle.dumps(pkt))
 
     return h.hexdigest()
 
 
-def is_ack():
-    # 7 Checks the acknowledgement flag in the packet whether it is a 0 or 1
-    # 8.1 if ACK flag 0 continue and make a packet makePacket()
-    # 8.2 if ACK flag 1 go back and
-    return 0
+def is_ack(packet):
+    # Sequence number, Ack flag, payload length, payload, checkSum
+
+    ack_flag = packet[4:8]
+
+    if ack_flag == 1:
+        return True
+    else:
+        return False
+
+
+def is_corrupt(packet):
+    # Storing all packet items in variables
+    seq_num = packet[0:4]
+    ack_flag = packet[4:8]
+    pay_len = packet[8:12]
+    payload = packet[12:32]
+
+    # Store checkSum number from packet into variable
+    check_sum = packet[32:].decode("ascii")
+
+    # Recreating packet using: sequence number, Ack flag, payload length, payload without checkSum
+    packet_to_check = seq_num + ack_flag + pay_len + payload
+
+    # Passing packet into method to generate checkSum
+    new_checksum = checksum(packet_to_check)
+
+    # if checksum value is the same return false
+    if check_sum == new_checksum:
+        return False
+
+    # if checksum value not the same return true
+    elif check_sum != new_checksum:
+        return True
 
 
 try:
@@ -56,18 +96,20 @@ try:
     print('CLIENT RUNNING')
 
     # Sending a packet with the festival request to the server
-
     clientSock.send(create_packet())
 
-    # Receive response
-
-    print('waiting to receive')
+    print('waiting to receive acknowledgement')
 
     # get the response & extract data
-    message = clientSock.recv(1024)
+    ack_pkt = clientSock.recv(1024)
 
-    #print('MESSAGE FROM SERVER: "%s" ' % message.decode("ascii"))
-    print('MESSAGE FROM SERVER: "%s" ' % message)
+    if is_corrupt(ack_pkt):
+        print("PACKET RECEIVED WAS CORRUPTED")
+    elif is_ack(ack_pkt):
+        print("PACKET RECEIVED WAS NOT AN ACKNOWLEDGEMENT")
+    else:
+        print("ACKNOWLEDGEMENT RECEIVED FROM SERVER")
+        exit()
 
 
 except socket.timeout as inst:

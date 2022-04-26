@@ -11,6 +11,8 @@ serverSocket = socket(AF_INET, SOCK_DGRAM)
 serverSocket.bind(('127.0.0.1', 13000))
 print("SERVER RUNNING")
 
+# Hardcode all ips that will be used
+
 
 def rdt_recv(rcvpkt):
     # Sequence number, Ack flag, payload length, payload, checkSum
@@ -32,43 +34,56 @@ def is_corrupt(packet):
 
     # Recreate packet without the checksum number at the end
 
-    packet = unpack("i i i 9s 32s ", packet)
+    #seq_num = int.from_bytes(packet[0:4], "big")
+    seq_num = packet[0:4]
+    ack_flag = packet[4:8]
+    pay_len = packet[8:12]
+    payload = packet[12:32]
 
-    check_sum = packet[4]
+    check_sum = packet[32:].decode("ascii")
+    packet_to_check = seq_num + ack_flag + pay_len + payload
 
     # Sequence number, Ack flag, payload length, payload, checkSum
-    new_checksum = checksum(pack("i i i 9s 32s", packet[0], packet[1], packet[2], packet[3], packet[4]))
+    new_checksum = checksum(packet_to_check)
 
-    # if checksum value is the same return true
+    # if checksum value is the same return false
     if check_sum == new_checksum:
-        return True
-
-    # if checksum value not the same return false
-    elif check_sum != new_checksum:
         return False
+
+    # if checksum value not the same return true
+    elif check_sum != new_checksum:
+        return True
 
 
 def checksum(pkt):
-    # Recreates the checksum of the packet
+
     h = hashlib.new('md5')
     h.update(pickle.dumps(pkt))
 
     return h.hexdigest()
-
 
 def create_packet():
     # Creating packet with the format
     # Creating acknowledgement packet
 
     seq_num = 0
-    ack_flag = 0
-    payload = b""
-    pay_len = len(payload)
+    ack_flag = 1
+    payload = ""
+    pay_len = len(payload.encode("ascii"))
+
+    # Need to pad the payload with extra characters since it is not at the maximum number of bytes
+    # Padding payload with f character
+    if len(payload) < 20:
+        temp = len(payload)
+        for i in range(temp, 20, 1):
+            payload = payload + "f"
+
+    payload = payload.encode("ascii")
 
     # Converting each number to 4 bytes as specified in RFC format
-    seq_num = seq_num.to_bytes(4, byteorder="little")
-    ack_flag = ack_flag.to_bytes(4, byteorder="little")
-    pay_len = pay_len.to_bytes(4, byteorder="little")
+    seq_num = seq_num.to_bytes(4, byteorder="big")
+    ack_flag = ack_flag.to_bytes(4, byteorder="big")
+    pay_len = pay_len.to_bytes(4, byteorder="big")
 
     # Sequence number, Ack flag, payload length, payload, checkSum
 
@@ -91,17 +106,19 @@ while True:
     # packet from client
     packet = client_data[0]
 
+
+
     # save the address it has received it from
     address = client_data[1]
 
     # Checking that the packet received is valid and that it is not corrupt
+    # If is_corrupt is false then the packet is in its correct state
 
     if not is_corrupt(packet):
         print("TEST SUCCESSFUL PACKET IS NOT CORRUPTED")
         print("SENDING ACKNOWLEDGEMENT PACKET")
         # Sending acknowledgement packet to the client
         serverSocket.sendto(create_packet(), address)
-
 
     else:
         print("CORRUPTED")
