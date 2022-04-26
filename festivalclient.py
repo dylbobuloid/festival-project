@@ -47,6 +47,42 @@ def create_packet():
     return pkt
 
 
+def create_ack_packet():
+    # Creating packet with the format
+    # Creating acknowledgement packet
+
+    seq_num = 0
+    ack_flag = 1
+    payload = ""
+    pay_len = len(payload.encode("ascii"))
+
+    # Need to pad the payload with extra characters since it is not at the maximum number of bytes
+    # Padding payload with f character
+    if len(payload) < 20:
+        temp = len(payload)
+        for i in range(temp, 20, 1):
+            payload = payload + "f"
+
+    payload = payload.encode("ascii")
+
+    # Converting each number to 4 bytes as specified in RFC format
+    seq_num = seq_num.to_bytes(4, byteorder="big")
+    ack_flag = ack_flag.to_bytes(4, byteorder="big")
+    pay_len = pay_len.to_bytes(4, byteorder="big")
+
+    # Sequence number, Ack flag, payload length, payload, checkSum
+
+    pkt_no_checksum = seq_num + ack_flag + pay_len + payload
+    checksum_num = checksum(pkt_no_checksum)
+
+    checksum_num = checksum_num.encode('ascii')
+
+    # Concatenate all together to create packet
+    pkt = seq_num + ack_flag + pay_len + payload + checksum_num
+
+    return pkt
+
+
 def checksum(pkt):
     # Takes packet and passes into md5 to generate checkSum number
     h = hashlib.new('md5')
@@ -90,33 +126,48 @@ def is_corrupt(packet):
     elif check_sum != new_checksum:
         return True
 
-
-try:
     # sent the Message using the clientSock
     print('CLIENT RUNNING')
 
     # Sending a packet with the festival request to the server
-    clientSock.send(create_packet())
 
+
+try:
+    clientSock.send(create_packet())
+    print('FESTIVAL REQUEST SENT')
     print('waiting to receive acknowledgement')
 
-    # get the response & extract data
-    ack_pkt = clientSock.recv(1024)
+    while True:
 
-    if is_corrupt(ack_pkt):
-        print("PACKET RECEIVED WAS CORRUPTED")
-    elif is_ack(ack_pkt):
-        print("PACKET RECEIVED WAS NOT AN ACKNOWLEDGEMENT")
-    else:
-        print("ACKNOWLEDGEMENT RECEIVED FROM SERVER")
-        exit()
+        # get the response & extract data
+        ack_pkt = clientSock.recv(1024)
+
+        if is_corrupt(ack_pkt):
+            print("PACKET RECEIVED WAS CORRUPTED")
+        elif is_ack(ack_pkt):
+            print("PACKET RECEIVED WAS NOT AN ACKNOWLEDGEMENT")
+        else:
+            print("ACKNOWLEDGEMENT RECEIVED")
+
+        greeting_pkt = clientSock.recv(1024)
+
+        if is_corrupt(greeting_pkt):
+            print("PACKET RECEIVED WAS CORRUPTED")
+        else:
+            pay_len = int.from_bytes(greeting_pkt[8:12], "big")
+            payload = greeting_pkt[12:32].decode("ascii")[:pay_len]
+            print("GREETING RECEIVED ({})".format(payload))
+
+            # Send acknowledgement
+            clientSock.send(create_ack_packet())
+            print("ACKNOWLEDGEMENT SENT")
 
 
 except socket.timeout as inst:
     print('ERROR HAS OCCURRED "%s"' % inst)
     ## handle timeouts
 
-print('closing socket')
-clientSock.close()
+# print('closing socket')
+# clientSock.close()
 
 ##close the socket
