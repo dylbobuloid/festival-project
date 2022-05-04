@@ -1,6 +1,5 @@
 import hashlib
 import pickle
-import random
 from struct import *
 from socket import *
 
@@ -63,54 +62,21 @@ def checksum(pkt):
     return h.hexdigest()
 
 
-def create_packet():
+def create_packet(seq, ack, pay_load):
     # Creating packet with the format
     # Creating acknowledgement packet
 
-    seq_num = 0
-    ack_flag = 1
-    payload = ""
-    pay_len = len(payload.encode("ascii"))
-
-    # Need to pad the payload with extra characters since it is not at the maximum number of bytes
-    # Padding payload with f character
-    if len(payload) < 20:
-        temp = len(payload)
-        for i in range(temp, 20, 1):
-            payload = payload + "f"
-
-    payload = payload.encode("ascii")
-
-    # Converting each number to 4 bytes as specified in RFC format
-    seq_num = seq_num.to_bytes(4, byteorder="big")
-    ack_flag = ack_flag.to_bytes(4, byteorder="big")
-    pay_len = pay_len.to_bytes(4, byteorder="big")
-
-    # Sequence number, Ack flag, payload length, payload, checkSum
-
-    pkt_no_checksum = seq_num + ack_flag + pay_len + payload
-    checksum_num = checksum(pkt_no_checksum)
-
-    checksum_num = checksum_num.encode('ascii')
-
-    # Concatenate all together to create packet
-    pkt = seq_num + ack_flag + pay_len + payload + checksum_num
-
-    return pkt
-
-
-def create_greeting_packet(seq, ack, payload):
     seq_num = seq
     ack_flag = ack
-    payload = "{}".format(payload)
+    payload = pay_load
     pay_len = len(payload.encode("ascii"))
 
     # Need to pad the payload with extra characters since it is not at the maximum number of bytes
-    # Padding payload with f character
+    # Padding payload with " " character
     if len(payload) < 20:
         temp = len(payload)
         for i in range(temp, 20, 1):
-            payload = payload + "f"
+            payload = payload + " "
 
     payload = payload.encode("ascii")
 
@@ -161,7 +127,7 @@ while True:
         print("[FESTIVAL REQUEST RECEIVED]")
         print("[SENDING ACKNOWLEDGEMENT PACKET]")
         # Sending acknowledgement packet to the client
-        serverSocket.sendto(create_packet(), address)
+        serverSocket.sendto(create_packet(0, 1, " "), address)
 
     else:
         print("[CORRUPTED]")
@@ -170,7 +136,7 @@ while True:
     pay_len = int.from_bytes(packet[8:12], "big")
     payload = "Merry " + packet[12:32].decode("ascii")[:pay_len]
     print("[SENDING GREETING]")
-    serverSocket.sendto(create_greeting_packet(0, 0, payload), address)
+    serverSocket.sendto(create_packet(0, 0, payload), address)
 
     client_ack = serverSocket.recvfrom(1024)[0]
 

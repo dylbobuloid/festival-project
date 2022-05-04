@@ -2,7 +2,7 @@
 import hashlib
 import pickle
 import socket
-from struct import *
+import time
 
 # Create a UDP socket
 UDP_IP_ADDRESS = "127.0.0.1"
@@ -13,55 +13,21 @@ clientSock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 clientSock.connect(("127.0.0.1", 13000))
 
 
-def create_packet():
-    # Creating packet with the format
-    seq_num = 0
-    ack_flag = 0
-    payload = "Christmas"
-    pay_len = len(payload.encode("ascii"))
-
-    # Need to pad the payload with extra characters since it is not at the maximum number of bytes
-    # Padding payload with f character
-    if len(payload) < 20:
-        temp = len(payload)
-        for i in range(temp, 20, 1):
-            payload = payload + "f"
-
-    payload = payload.encode("ascii")
-
-    # Converting each number to 4 bytes as specified in RFC format
-    seq_num = seq_num.to_bytes(4, byteorder="big")
-    ack_flag = ack_flag.to_bytes(4, byteorder="big")
-    pay_len = pay_len.to_bytes(4, byteorder="big")
-
-    # Sequence number, Ack flag, payload length, payload, checkSum
-
-    pkt_no_checksum = seq_num + ack_flag + pay_len + payload
-    checksum_num = checksum(pkt_no_checksum)
-
-    checksum_num = checksum_num.encode('ascii')
-
-    # Concatenate all together to create packet
-    pkt = seq_num + ack_flag + pay_len + payload + checksum_num
-
-    return pkt
-
-
-def create_ack_packet():
+def create_packet(seq, ack, pay_load):
     # Creating packet with the format
     # Creating acknowledgement packet
 
-    seq_num = 0
-    ack_flag = 1
-    payload = ""
+    seq_num = seq
+    ack_flag = ack
+    payload = pay_load
     pay_len = len(payload.encode("ascii"))
 
     # Need to pad the payload with extra characters since it is not at the maximum number of bytes
-    # Padding payload with f character
+    # Padding payload with " " character
     if len(payload) < 20:
         temp = len(payload)
         for i in range(temp, 20, 1):
-            payload = payload + "f"
+            payload = payload + " "
 
     payload = payload.encode("ascii")
 
@@ -133,34 +99,40 @@ def is_corrupt(packet):
 
 
 try:
-    clientSock.send(create_packet())
+    clientSock.send(create_packet(0, 0, "Christmas"))
     print('FESTIVAL REQUEST SENT')
+
+    # Starting the timer
+    timeout = time.time() + 60
     print('waiting to receive acknowledgement')
 
     while True:
 
-        # get the response & extract data
-        ack_pkt = clientSock.recv(1024)
-
-        if is_corrupt(ack_pkt):
-            print("PACKET RECEIVED WAS CORRUPTED")
-        elif is_ack(ack_pkt):
-            print("PACKET RECEIVED WAS NOT AN ACKNOWLEDGEMENT")
+        if time.time() > timeout:
+            print("it took too long to send the packet")
         else:
-            print("ACKNOWLEDGEMENT RECEIVED")
+            # get the response & extract data
+            ack_pkt = clientSock.recv(1024)
 
-        greeting_pkt = clientSock.recv(1024)
+            if is_corrupt(ack_pkt):
+                print("PACKET RECEIVED WAS CORRUPTED")
+            elif is_ack(ack_pkt):
+                print("PACKET RECEIVED WAS NOT AN ACKNOWLEDGEMENT")
+            else:
+                print("ACKNOWLEDGEMENT RECEIVED")
 
-        if is_corrupt(greeting_pkt):
-            print("PACKET RECEIVED WAS CORRUPTED")
-        else:
-            pay_len = int.from_bytes(greeting_pkt[8:12], "big")
-            payload = greeting_pkt[12:32].decode("ascii")[:pay_len]
-            print("GREETING RECEIVED ({})".format(payload))
+            greeting_pkt = clientSock.recv(1024)
 
-            # Send acknowledgement
-            clientSock.send(create_ack_packet())
-            print("ACKNOWLEDGEMENT SENT")
+            if is_corrupt(greeting_pkt):
+                print("PACKET RECEIVED WAS CORRUPTED")
+            else:
+                pay_len = int.from_bytes(greeting_pkt[8:12], "big")
+                payload = greeting_pkt[12:32].decode("ascii")[:pay_len]
+                print("GREETING RECEIVED ({})".format(payload))
+
+                # Send acknowledgement
+                clientSock.send(create_packet(0, 1, " "))
+                print("ACKNOWLEDGEMENT SENT")
 
 
 except socket.timeout as inst:
