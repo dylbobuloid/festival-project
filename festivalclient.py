@@ -68,6 +68,17 @@ def is_ack(packet):
         return False
 
 
+def seq_mismatch(packet):
+    # Sequence number, Ack flag, payload length, payload, checkSum
+
+    ack_flag = packet[:4]
+
+    if ack_flag == 0:
+        return True
+    else:
+        return False
+
+
 def is_corrupt(packet):
     # Storing all packet items in variables
     seq_num = packet[0:4]

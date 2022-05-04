@@ -28,6 +28,8 @@ def rdt_recv(rcvpkt):
     check_sum = packet[4].decode("ascii")
 
 
+
+
 def is_corrupt(packet):
     # 3 Store checkSum number from packet into variable
     # 4 Create checkSum number again using the sequence number, ack flag, payload length, and payload
@@ -104,6 +106,17 @@ def is_ack(packet):
     ack_flag = packet[4:8]
 
     if ack_flag == 1:
+        return True
+    else:
+        return False
+
+
+def seq_mismatch(packet):
+    # Sequence number, Ack flag, payload length, payload, checkSum
+
+    ack_flag = packet[:4]
+
+    if ack_flag == 0:
         return True
     else:
         return False
