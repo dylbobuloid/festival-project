@@ -1,5 +1,6 @@
 import hashlib
 import pickle
+import time
 from struct import *
 from socket import *
 
@@ -26,8 +27,6 @@ def rdt_recv(rcvpkt):
 
     payload = packet[3].decode("ascii")
     check_sum = packet[4].decode("ascii")
-
-
 
 
 def is_corrupt(packet):
@@ -103,7 +102,7 @@ def create_packet(seq, ack, pay_load):
 def is_ack(packet):
     # Sequence number, Ack flag, payload length, payload, checkSum
 
-    ack_flag = packet[4:8]
+    ack_flag = int.from_bytes(packet[4:8], "big")
 
     if ack_flag == 1:
         return True
@@ -140,7 +139,7 @@ while True:
         print("[FESTIVAL REQUEST RECEIVED]")
         print("[SENDING ACKNOWLEDGEMENT PACKET]")
         # Sending acknowledgement packet to the client
-        serverSocket.sendto(create_packet(0, 1, " "), address)
+        serverSocket.sendto(create_packet(0, 0, " "), address)
 
     else:
         print("[CORRUPTED]")
@@ -149,16 +148,14 @@ while True:
     pay_len = int.from_bytes(packet[8:12], "big")
     payload = "Merry " + packet[12:32].decode("ascii")[:pay_len]
     print("[SENDING GREETING]")
+
     serverSocket.sendto(create_packet(0, 0, payload), address)
 
     client_ack = serverSocket.recvfrom(1024)[0]
 
     if is_corrupt(client_ack):
         print("[PACKET RECEIVED WAS CORRUPTED]")
-    elif is_ack(client_ack):
+    elif not is_ack(client_ack):
         print("[PACKET RECEIVED WAS NOT AN ACKNOWLEDGEMENT]")
     else:
         print("[ACKNOWLEDGEMENT RECEIVED]")
-
-
-

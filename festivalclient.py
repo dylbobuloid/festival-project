@@ -10,6 +10,7 @@ UDP_PORT_NO = 12000
 
 # create a socket with address and port
 clientSock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+clientSock.settimeout(60)
 clientSock.connect(("127.0.0.1", 13000))
 
 
@@ -60,7 +61,7 @@ def checksum(pkt):
 def is_ack(packet):
     # Sequence number, Ack flag, payload length, payload, checkSum
 
-    ack_flag = packet[4:8]
+    ack_flag = int.from_bytes(packet[4:8], "big")
 
     if ack_flag == 1:
         return True
@@ -71,9 +72,9 @@ def is_ack(packet):
 def seq_mismatch(packet):
     # Sequence number, Ack flag, payload length, payload, checkSum
 
-    ack_flag = packet[:4]
+    seq = packet[:4]
 
-    if ack_flag == 0:
+    if seq == 2:
         return True
     else:
         return False
@@ -109,48 +110,51 @@ def is_corrupt(packet):
     # Sending a packet with the festival request to the server
 
 
-try:
+def festival_request():
     clientSock.send(create_packet(0, 0, "Christmas"))
     print('FESTIVAL REQUEST SENT')
 
-    # Starting the timer
-    timeout = time.time() + 60
-    print('waiting to receive acknowledgement')
 
-    while True:
+while True:
 
-        if time.time() > timeout:
-            print("it took too long to send the packet")
-        else:
-            # get the response & extract data
-            ack_pkt = clientSock.recv(1024)
+    # send festival request
+    try:
+        festival_request()
+        print('waiting to receive acknowledgement')
+        ack_pkt = clientSock.recv(1024)
+    except socket.timeout as inst:
+        print('TIMEOUT: 60 SECOND LIMIT HAS REACHED "%s"' % inst)
+        print('SENDING FESTIVAL REQUEST AGAIN')
+        continue
 
-            if is_corrupt(ack_pkt):
-                print("PACKET RECEIVED WAS CORRUPTED")
-            elif is_ack(ack_pkt):
-                print("PACKET RECEIVED WAS NOT AN ACKNOWLEDGEMENT")
-            else:
-                print("ACKNOWLEDGEMENT RECEIVED")
+    if is_corrupt(ack_pkt):
+        print("PACKET RECEIVED WAS CORRUPTED")
+        continue
+    elif not is_ack(ack_pkt):
+        print("PACKET RECEIVED WAS NOT AN ACKNOWLEDGEMENT")
+        continue
+    else:
+        print("ACKNOWLEDGEMENT RECEIVED")
+        print('waiting to receive greeting...')
 
+        try:
             greeting_pkt = clientSock.recv(1024)
+        except socket.timeout as inst:
+            print('TIMEOUT: 60 SECOND LIMIT HAS REACHED FESTIVAL NOT RECEIVED "%s"' % inst)
+            continue
 
-            if is_corrupt(greeting_pkt):
-                print("PACKET RECEIVED WAS CORRUPTED")
-            else:
-                pay_len = int.from_bytes(greeting_pkt[8:12], "big")
-                payload = greeting_pkt[12:32].decode("ascii")[:pay_len]
-                print("GREETING RECEIVED ({})".format(payload))
+        if is_corrupt(greeting_pkt):
+            print("PACKET RECEIVED WAS CORRUPTED")
+            continue
+        else:
+            pay_len = int.from_bytes(greeting_pkt[8:12], "big")
+            payload = greeting_pkt[12:32].decode("ascii")[:pay_len]
+            print("GREETING RECEIVED ({})".format(payload))
 
-                # Send acknowledgement
-                clientSock.send(create_packet(0, 1, " "))
-                print("ACKNOWLEDGEMENT SENT")
+            # Send acknowledgement
+            clientSock.send(create_packet(0, 1, " "))
+            print("ACKNOWLEDGEMENT SENT")
+            print('closing socket')
+            clientSock.close()
+            break
 
-
-except socket.timeout as inst:
-    print('ERROR HAS OCCURRED "%s"' % inst)
-    ## handle timeouts
-
-# print('closing socket')
-# clientSock.close()
-
-##close the socket
