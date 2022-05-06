@@ -13,6 +13,9 @@ print("SERVER RUNNING")
 # List of whitelisted IPs
 listOfIps = ['', '', '', '', '', '']
 
+# Dictionary of festivals  Key: Value
+festival_dict = {"Christmas": "Merry Christmas", "Diwali": "Happy Diwali", "Easter": "Happy Easter", "Eid": "Eid Mubarak"}
+
 
 def rdt_recv(rcvpkt):
     # Sequence number, Ack flag, payload length, payload, checkSum
@@ -26,6 +29,16 @@ def rdt_recv(rcvpkt):
 
     payload = packet[3].decode("ascii")
     check_sum = packet[4].decode("ascii")
+
+
+def festival_reply(festival):
+    if festival in festival_dict:
+        for key in festival_dict:
+            if festival == key:
+                return festival_dict.get(key)
+
+    else:
+        print("Unfortunately your desired festival {} is not supported with our protocol".format(festival.upper()))
 
 
 def is_corrupt(packet):
@@ -146,8 +159,7 @@ while True:
 
     # Send greeting
     pay_len = int.from_bytes(packet[8:12], "big")
-    payload = "Merry " + packet[12:32].decode("ascii")[:pay_len]
+    greeting = festival_reply(packet[12:32].decode("ascii")[:pay_len])
     print("[SENDING GREETING]")
 
-    serverSocket.sendto(create_packet(0, 0, payload), address)
-
+    serverSocket.sendto(create_packet(0, 0, greeting), address)

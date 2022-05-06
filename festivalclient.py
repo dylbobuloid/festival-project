@@ -152,3 +152,5 @@ while True:
             pay_len = int.from_bytes(greeting_pkt[8:12], "big")
             payload = greeting_pkt[12:32].decode("ascii")[:pay_len]
             print("GREETING RECEIVED ({})".format(payload))
+            clientSock.close()
+            break
