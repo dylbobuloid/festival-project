@@ -11,7 +11,7 @@ UDP_PORT_NO = 12000
 # create a socket with address and port
 clientSock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 clientSock.settimeout(60)
-clientSock.connect(("127.0.0.1", 13000))
+clientSock.connect(("127.0.0.1", 10000))
 
 
 def create_packet(seq, ack, pay_load):
@@ -74,7 +74,7 @@ def seq_mismatch(packet):
 
     seq = packet[:4]
 
-    if seq == 2:
+    if seq != 0:
         return True
     else:
         return False
@@ -130,6 +130,8 @@ while True:
     if is_corrupt(ack_pkt):
         print("PACKET RECEIVED WAS CORRUPTED")
         continue
+
+    # Checking if packet received IS an Acknowledgment
     elif not is_ack(ack_pkt):
         print("PACKET RECEIVED WAS NOT AN ACKNOWLEDGEMENT")
         continue
@@ -150,11 +152,3 @@ while True:
             pay_len = int.from_bytes(greeting_pkt[8:12], "big")
             payload = greeting_pkt[12:32].decode("ascii")[:pay_len]
             print("GREETING RECEIVED ({})".format(payload))
-
-            # Send acknowledgement
-            clientSock.send(create_packet(0, 1, " "))
-            print("ACKNOWLEDGEMENT SENT")
-            print('closing socket')
-            clientSock.close()
-            break
-

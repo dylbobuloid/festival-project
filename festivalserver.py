@@ -1,6 +1,5 @@
 import hashlib
 import pickle
-import time
 from struct import *
 from socket import *
 
@@ -8,11 +7,11 @@ from socket import *
 # Notice the use of SOCK_DGRAM for UDP packets
 serverSocket = socket(AF_INET, SOCK_DGRAM)
 # Assign IP address and port number to socket
-serverSocket.bind(('127.0.0.1', 13000))
+serverSocket.bind(('127.0.0.1', 10000))
 print("SERVER RUNNING")
 
-
-# Hardcode all ips that will be used
+# List of whitelisted IPs
+listOfIps = ['', '', '', '', '', '']
 
 
 def rdt_recv(rcvpkt):
@@ -113,9 +112,9 @@ def is_ack(packet):
 def seq_mismatch(packet):
     # Sequence number, Ack flag, payload length, payload, checkSum
 
-    ack_flag = packet[:4]
+    seq = packet[:4]
 
-    if ack_flag == 0:
+    if seq != 0:
         return True
     else:
         return False
@@ -131,6 +130,7 @@ while True:
 
     # save the address it has received it from
     address = client_data[1]
+    print(address)
 
     # Checking that the packet received is valid and that it is not corrupt
     # If is_corrupt is false then the packet is in its correct state
@@ -139,7 +139,7 @@ while True:
         print("[FESTIVAL REQUEST RECEIVED]")
         print("[SENDING ACKNOWLEDGEMENT PACKET]")
         # Sending acknowledgement packet to the client
-        serverSocket.sendto(create_packet(0, 0, " "), address)
+        serverSocket.sendto(create_packet(0, 1, " "), address)
 
     else:
         print("[CORRUPTED]")
@@ -151,11 +151,3 @@ while True:
 
     serverSocket.sendto(create_packet(0, 0, payload), address)
 
-    client_ack = serverSocket.recvfrom(1024)[0]
-
-    if is_corrupt(client_ack):
-        print("[PACKET RECEIVED WAS CORRUPTED]")
-    elif not is_ack(client_ack):
-        print("[PACKET RECEIVED WAS NOT AN ACKNOWLEDGEMENT]")
-    else:
-        print("[ACKNOWLEDGEMENT RECEIVED]")
