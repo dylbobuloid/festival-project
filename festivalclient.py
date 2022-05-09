@@ -2,33 +2,32 @@
 import hashlib
 import pickle
 import socket
-import time
-
-# Create a UDP socket
-UDP_IP_ADDRESS = "127.0.0.1"
-UDP_PORT_NO = 12000
+from random import *
 
 # create a socket with address and port
+
+
 clientSock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 clientSock.settimeout(60)
-clientSock.connect(("127.0.0.1", 10000))
+clientSock.connect(('127.0.0.1', 1062))
+
+# Maximum number of tries the packets will be sent
+max_tries = 10
+# Counting how many attempts the client has made to send a festival request packet
+num_of_tries = 0
 
 
-def create_packet(seq, ack, pay_load):
+def create_packet(ack, pay_load):
     # Creating packet with the format
     # Creating acknowledgement packet
 
-    seq_num = seq
     ack_flag = ack
     payload = pay_load
     pay_len = len(payload.encode("ascii"))
+    seq_num = randint(1, 100) + pay_len
 
     # Need to pad the payload with extra characters since it is not at the maximum number of bytes
     # Padding payload with " " character
-    if len(payload) < 20:
-        temp = len(payload)
-        for i in range(temp, 20, 1):
-            payload = payload + " "
 
     payload = payload.encode("ascii")
 
@@ -42,7 +41,7 @@ def create_packet(seq, ack, pay_load):
     pkt_no_checksum = seq_num + ack_flag + pay_len + payload
     checksum_num = checksum(pkt_no_checksum)
 
-    checksum_num = checksum_num.encode('ascii')
+    # checksum_num = checksum_num.encode('ascii')
 
     # Concatenate all together to create packet
     pkt = seq_num + ack_flag + pay_len + payload + checksum_num
@@ -54,8 +53,8 @@ def checksum(pkt):
     # Takes packet and passes into md5 to generate checkSum number
     h = hashlib.new('md5')
     h.update(pickle.dumps(pkt))
-
-    return h.hexdigest()
+    # checksum doesn't match    
+    return h.digest()
 
 
 def is_ack(packet):
@@ -69,12 +68,22 @@ def is_ack(packet):
         return False
 
 
-def seq_mismatch(packet):
+def seq_mismatch(req_pkt, ack_pkt):
     # Sequence number, Ack flag, payload length, payload, checkSum
 
-    seq = packet[:4]
+    # recreate sequence number
 
-    if seq != 0:
+    pay_len = int.from_bytes(req_pkt[8:12], byteorder="big")
+    seq = int.from_bytes(req_pkt[:4], byteorder="big")
+
+    original_sequence_num = seq + pay_len
+
+    ack_pkt_seq = int.from_bytes(req_pkt[:4], byteorder="big")
+    ack_pkt_pay_len = int.from_bytes(ack_pkt[8:12], byteorder="big")
+
+    ack_sequence_num = ack_pkt_seq + pay_len
+
+    if original_sequence_num != ack_sequence_num:
         return True
     else:
         return False
@@ -85,10 +94,11 @@ def is_corrupt(packet):
     seq_num = packet[0:4]
     ack_flag = packet[4:8]
     pay_len = packet[8:12]
-    payload = packet[12:32]
+    payloadLength = int.from_bytes(pay_len, byteorder='big')
+    payload = packet[12:payloadLength + 12]
 
     # Store checkSum number from packet into variable
-    check_sum = packet[32:].decode("ascii")
+    check_sum = packet[payloadLength + 12:]
 
     # Recreating packet using: sequence number, Ack flag, payload length, payload without checkSum
     packet_to_check = seq_num + ack_flag + pay_len + payload
@@ -111,17 +121,26 @@ def is_corrupt(packet):
 
 
 def festival_request():
-    clientSock.send(create_packet(0, 0, "Christmas"))
-    print('FESTIVAL REQUEST SENT')
+    festival_pkt = (create_packet(0, "Christmas"))
+    return festival_pkt
 
 
 while True:
 
+    # If the number of tries is greater than 10 stop sending requests
+
+    num_of_tries += 1
+    if num_of_tries > 10:
+        print("MAXIMUM NUMBER OF TRIES REACHED: ENDING")
+        clientSock.close()
+
     # send festival request
     try:
-        festival_request()
+        req_pkt = festival_request()
+        clientSock.send(req_pkt)
+        print('FESTIVAL REQUEST SENT')
         print('waiting to receive acknowledgement')
-        ack_pkt = clientSock.recv(1024)
+        ack_pkt = clientSock.recv(2048)
     except socket.timeout as inst:
         print('TIMEOUT: 60 SECOND LIMIT HAS REACHED "%s"' % inst)
         print('SENDING FESTIVAL REQUEST AGAIN')
@@ -131,16 +150,23 @@ while True:
         print("PACKET RECEIVED WAS CORRUPTED")
         continue
 
+
     # Checking if packet received IS an Acknowledgment
     elif not is_ack(ack_pkt):
         print("PACKET RECEIVED WAS NOT AN ACKNOWLEDGEMENT")
         continue
+
+    # Checking if sequence number is correct
+    elif seq_mismatch(req_pkt, ack_pkt):
+        print("SEQUENCE MISMATCH ERROR")
+        continue
+
     else:
         print("ACKNOWLEDGEMENT RECEIVED")
         print('waiting to receive greeting...')
 
         try:
-            greeting_pkt = clientSock.recv(1024)
+            greeting_pkt = clientSock.recv(2048)
         except socket.timeout as inst:
             print('TIMEOUT: 60 SECOND LIMIT HAS REACHED FESTIVAL NOT RECEIVED "%s"' % inst)
             continue
@@ -148,9 +174,11 @@ while True:
         if is_corrupt(greeting_pkt):
             print("PACKET RECEIVED WAS CORRUPTED")
             continue
+
+
         else:
             pay_len = int.from_bytes(greeting_pkt[8:12], "big")
-            payload = greeting_pkt[12:32].decode("ascii")[:pay_len]
+            payload = greeting_pkt[12:pay_len + 12].decode("ascii")
             print("GREETING RECEIVED ({})".format(payload))
             clientSock.close()
             break
